@@ -20,22 +20,40 @@ export function NewCourseButton() {
   const [title, setTitle] = React.useState("");
   const [desc, setDesc] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setError("Title is required.");
+      return;
+    }
     setBusy(true);
-    const res = await fetch("/api/courses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, description: desc }),
-    });
-    setBusy(false);
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: trimmedTitle, description: desc.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const msg =
+          (body && typeof body.error === "string" && body.error) ||
+          (res.status === 401 ? "You need to sign in again." : `Couldn't create course (${res.status}).`);
+        setError(msg);
+        return;
+      }
       setOpen(false);
       setTitle("");
       setDesc("");
       router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -70,6 +88,11 @@ export function NewCourseButton() {
               placeholder="Optional"
             />
           </div>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
           <Button type="submit" disabled={busy} className="w-full">
             {busy ? "Creating…" : "Create course"}
           </Button>
