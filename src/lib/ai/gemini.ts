@@ -66,10 +66,11 @@ Task: ${opts.task}`;
     config.responseSchema = opts.schema;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await ai.models.generateContent({
     model: MODEL,
     contents,
-    config,
+    config: config as any,
   });
 
   const text = (res as { text?: string }).text ?? "";
@@ -116,10 +117,11 @@ Always cite the slide for any factual claim using [Slide N].`;
   const stream = await ai.models.generateContentStream({
     model: MODEL,
     contents,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     config: {
       systemInstruction: sys,
       thinkingConfig: { thinkingLevel: "medium" },
-    },
+    } as any,
   });
 
   for await (const chunk of stream) {
