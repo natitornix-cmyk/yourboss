@@ -4,14 +4,19 @@ import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  // Allow the build to complete even without DATABASE_URL set; queries will throw at runtime.
+let client: ReturnType<typeof postgres> | undefined;
+if (connectionString) {
+  try {
+    client = postgres(connectionString, { prepare: false, max: 10 });
+  } catch (e) {
+    console.error(
+      "Invalid DATABASE_URL — Drizzle queries will fail until it is fixed:",
+      e instanceof Error ? e.message : e,
+    );
+  }
+} else {
   console.warn("DATABASE_URL is not set. Drizzle queries will fail until it is configured.");
 }
-
-const client = connectionString
-  ? postgres(connectionString, { prepare: false, max: 10 })
-  : (undefined as unknown as ReturnType<typeof postgres>);
 
 export const db = client ? drizzle(client, { schema }) : (null as never);
 export { schema };
