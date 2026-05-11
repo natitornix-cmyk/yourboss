@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/server";
+import { db, schema } from "@/db";
 import { Sidebar } from "@/components/shell/sidebar";
 import { BottomNav } from "@/components/shell/bottom-nav";
 import { Topbar } from "@/components/shell/topbar";
@@ -12,6 +13,20 @@ export default async function AppLayout({
 }) {
   const user = await getUser();
   if (!user) redirect("/login");
+
+  // Ensure the user row exists in our app table on every sign-in path.
+  try {
+    await db
+      .insert(schema.users)
+      .values({
+        id: user.id,
+        email: user.email!,
+        displayName: user.user_metadata?.full_name ?? null,
+      })
+      .onConflictDoNothing();
+  } catch (e) {
+    console.error("Failed to upsert user row:", e);
+  }
 
   return (
     <div className="min-h-screen flex">

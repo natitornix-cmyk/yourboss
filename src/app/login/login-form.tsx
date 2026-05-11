@@ -1,32 +1,48 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
+  const [mode, setMode] = React.useState<"magic" | "password">("magic");
   const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
   const [status, setStatus] = React.useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("sending");
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/today`,
-      },
-    });
-    if (error) {
-      setStatus("error");
-      setError(error.message);
+
+    if (mode === "magic") {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/today`,
+        },
+      });
+      if (error) {
+        setStatus("error");
+        setError(error.message);
+      } else {
+        setStatus("sent");
+      }
     } else {
-      setStatus("sent");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setStatus("error");
+        setError(error.message);
+      } else {
+        router.push("/today");
+        router.refresh();
+      }
     }
   }
 
@@ -52,10 +68,38 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
+      {mode === "password" && (
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+      )}
       <Button type="submit" className="w-full" disabled={status === "sending"}>
-        {status === "sending" ? "Sending…" : "Send magic link"}
+        {status === "sending"
+          ? mode === "magic"
+            ? "Sending…"
+            : "Signing in…"
+          : mode === "magic"
+            ? "Send magic link"
+            : "Sign in"}
       </Button>
       {error && <p className="text-sm text-red-400">{error}</p>}
+      <button
+        type="button"
+        onClick={() => {
+          setMode(mode === "magic" ? "password" : "magic");
+          setError(null);
+        }}
+        className="text-xs text-muted-foreground hover:text-foreground w-full text-center"
+      >
+        {mode === "magic" ? "Sign in with a password instead" : "Use a magic link instead"}
+      </button>
     </form>
   );
 }
