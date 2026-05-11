@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { db, schema } from "@/db";
 import { getUser } from "@/lib/supabase/server";
 import { createAdminClient, DECK_BUCKET } from "@/lib/supabase/admin";
@@ -6,7 +6,7 @@ import { processDeck } from "@/lib/ai/process-deck";
 import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const user = await getUser();
@@ -56,13 +56,19 @@ export async function POST(req: Request) {
     })
     .returning();
 
-  // Fire-and-forget background processing. Errors are caught and persisted.
-  processDeck({ deckId: deck.id, userId: user.id, bytes }).catch(async (e) => {
-    console.error("processDeck failed", e);
-    await db
-      .update(schema.decks)
-      .set({ status: "failed", processingError: String(e?.message ?? e) })
-      .where(eq(schema.decks.id, deck.id));
+  // Run after the response is sent so the upload feels instant, but keep
+  // the function alive (within maxDuration) so Gemini actually completes.
+  after(async () => {
+    try {
+      await processDeck({ deckId: deck.id, userId: user.id, bytes });
+    } catch (e) {
+      console.error("processDeck failed", e);
+      const message = e instanceof Error ? e.message : String(e);
+      await db
+        .update(schema.decks)
+        .set({ status: "failed", processingError: message })
+        .where(eq(schema.decks.id, deck.id));
+    }
   });
 
   return NextResponse.json({ deck });

@@ -5,6 +5,8 @@ import { getDeck, getQuestionsForDeck, getFlashcardsForDeck } from "@/lib/data/q
 import { createAdminClient, DECK_BUCKET } from "@/lib/supabase/admin";
 import { DeckWorkspace } from "./deck-workspace";
 
+export const dynamic = "force-dynamic";
+
 export default async function DeckPage({
   params,
 }: {
@@ -26,8 +28,10 @@ export default async function DeckPage({
   ]);
 
   if (deck.status !== "ready") {
+    const stillWorking = deck.status === "processing" || deck.status === "uploading";
     return (
       <div className="container max-w-3xl py-16 text-center space-y-4">
+        {stillWorking && <meta httpEquiv="refresh" content="5" />}
         <h1 className="text-2xl font-semibold">{deck.title}</h1>
         <p className="text-muted-foreground">
           {deck.status === "processing"

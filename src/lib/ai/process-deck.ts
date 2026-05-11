@@ -25,13 +25,22 @@ NLE1 topic codes (subset of: ${TOPIC_CODES.join(", ")}), 5-12 high-yield concept
 30 USMLE-style 5-option MCQs (with explanations and per-distractor rationales),
 and 50 atomic flashcards. Anchor every question and flashcard to a slide.`;
 
-  const result = await generate<DeckProcessingResult>({
-    task: "deck-process",
-    input: { kind: "pdf", bytes, prompt },
-    schema: deckProcessingSchema as unknown as Record<string, unknown>,
-    thinkingLevel: "high",
-    maxOutputTokens: 32000,
-  });
+  const GEMINI_TIMEOUT_MS = 4 * 60 * 1000;
+  const result = await Promise.race([
+    generate<DeckProcessingResult>({
+      task: "deck-process",
+      input: { kind: "pdf", bytes, prompt },
+      schema: deckProcessingSchema as unknown as Record<string, unknown>,
+      thinkingLevel: "high",
+      maxOutputTokens: 32000,
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Gemini timed out after ${GEMINI_TIMEOUT_MS / 1000}s`)),
+        GEMINI_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 
   await db.transaction(async (tx) => {
     await tx
